@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import axios from 'axios'
 import './Subject.css'
+import { useTTS, useSTT } from '../components/AccessibilityToolbar'
 
 const API = 'http://localhost:8000/api'
 
@@ -25,6 +26,32 @@ export default function SubjectPage() {
   const [view, setView] = useState('home')
   const [isExtra, setIsExtra] = useState(false)
   const [extraNum, setExtraNum] = useState(0)
+  const [summary, setSummary] = useState(null)
+  const [summaryLoading, setSummaryLoading] = useState(false)
+
+  const { speak, ttsEnabled } = useTTS()
+  const { listening, startListening, stopListening, sttEnabled } = useSTT(text => setCodeAnswer(prev => prev + text))
+
+  const readLesson = () => {
+    const td = lesson?.task_data || {}
+    const text = [td.topic, td.introduction, td.concept, (td.keypoints || []).join('. ')].filter(Boolean).join('. ')
+    speak(text)
+  }
+
+  const fetchSummary = async () => {
+    if (!lesson) return
+    setSummaryLoading(true)
+    setSummary(null)
+    try {
+      const td = lesson.task_data || {}
+      const text = [td.introduction, td.concept].filter(Boolean).join(' ')
+      const res = await axios.post(`${API}/plan/summarize`, { text })
+      setSummary(res.data.bullets)
+    } catch { setSummary(['Could not generate summary. Try again.']) }
+    setSummaryLoading(false)
+  }
+
+  useEffect(() => { setSummary(null) }, [lesson])
 
   useEffect(() => {
     if (!userId) { navigate('/login'); return }
@@ -289,6 +316,23 @@ export default function SubjectPage() {
             </div>
             <h2 className="lesson-topic">{td.topic || lesson.topic}</h2>
 
+            <div style={{display:'flex',gap:'8px',flexWrap:'wrap',margin:'8px 0 4px'}}>
+              {ttsEnabled && (
+                <button className="tts-read-btn" onClick={readLesson}>🔊 Read Lesson</button>
+              )}
+              <button className="tts-read-btn" onClick={fetchSummary} disabled={summaryLoading}>
+                {summaryLoading ? '⏳ Summarizing...' : '🧠 Summarize'}
+              </button>
+            </div>
+
+            {summaryLoading && <p className="a11y-summary-loading">Generating summary…</p>}
+            {summary && (
+              <div className="a11y-summary-box">
+                <h4>📌 Quick Summary</h4>
+                <ul>{summary.map((b, i) => <li key={i}>{b}</li>)}</ul>
+              </div>
+            )}
+
             {td.introduction && <div className="lesson-block intro-block"><h4>🎯 Introduction</h4><p>{td.introduction}</p></div>}
             {td.concept && <div className="lesson-block concept-block"><h4>📖 Concept</h4><p>{td.concept}</p></div>}
             {td.syntax && <div className="lesson-block code-block"><h4>💻 Syntax & Example</h4><pre>{td.syntax}</pre></div>}
@@ -337,6 +381,15 @@ export default function SubjectPage() {
                   {td.hint && <div className="hint-line">💡 {td.hint}</div>}
                 </div>
                 <textarea className="code-box" placeholder="Write your code here..." value={codeAnswer} onChange={e=>setCodeAnswer(e.target.value)} disabled={submitted} />
+                {sttEnabled && !submitted && (
+                  <button
+                    className={`stt-mic-btn ${listening ? 'listening' : ''}`}
+                    onClick={listening ? stopListening : startListening}
+                    style={{marginTop:'8px'}}
+                  >
+                    🎤 {listening ? 'Listening… (click to stop)' : 'Speak Answer'}
+                  </button>
+                )}
                 {!submitted && <button className="action-btn" style={{background:color}} disabled={codeAnswer.trim().length<10} onClick={()=>setSubmitted(true)}>Submit Code</button>}
                 {submitted && td.solution && <div className="solution-box"><strong>✅ Example Solution:</strong><pre>{td.solution}</pre></div>}
                 {completeError && <div className="complete-error">{completeError}</div>}

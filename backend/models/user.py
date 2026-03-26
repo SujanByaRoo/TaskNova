@@ -12,6 +12,7 @@ class User(Base):
     password_hash = Column(String, nullable=False)
     daily_study_hours = Column(Float, default=2.0)
     study_style = Column(String, default="balanced")  # visual / reading / practice
+    disability = Column(String, default="")  # comma-separated: visual,hearing,cognitive
     created_at = Column(DateTime, default=datetime.utcnow)
 
     streaks = relationship("Streak", back_populates="user")

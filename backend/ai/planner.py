@@ -1,9 +1,13 @@
 import requests
 import json
 import re
+import os
+from dotenv import load_dotenv
 
-GROQ_API_KEY = "********************"
-GROQ_URL = "*******************"
+load_dotenv()
+
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 MODEL = "llama-3.3-70b-versatile"
 
 
@@ -52,7 +56,6 @@ Rules for type:
     for t in ["coding", "aiml", "math", "language", "theory"]:
         if f"type: {t}" in raw or f"type:{t}" in raw:
             return t
-    # If valid but type unclear default to theory
     if "valid: yes" in raw or "valid:yes" in raw:
         return "theory"
     return None
@@ -62,24 +65,20 @@ def generate_single_lesson(subject: str, subject_type: str, day: int, topics_see
     seen = ", ".join(topics_seen[-5:]) if topics_seen else "none"
     is_stressed = mood_score <= 2
 
-    # Build lesson using separate calls to avoid JSON issues
     difficulty = "beginner introduction" if day <= 2 else "intermediate" if day <= 5 else "advanced"
     mood_str = "stressed student - keep SHORT and SIMPLE" if is_stressed else "normal student - full lesson"
 
-    # Get topic
     topic_raw = call_groq_text(
         f"What should a {difficulty} student learn in {subject} on Day {day}? Previously covered: {seen}. Give me ONLY the topic name, nothing else. 5 words max.",
         max_tokens=20
     )
     topic = topic_raw.strip().strip('"').strip("'") or f"{subject} Day {day} Basics"
 
-    # Get introduction
     intro_raw = call_groq_text(
         f"Write a 2-sentence introduction for a lesson on '{topic}' in {subject}. Student mood: {mood_str}. Be direct and motivating.",
         max_tokens=100
     )
 
-    # Get concept explanation
     if is_stressed:
         concept_raw = call_groq_text(
             f"Explain '{topic}' in {subject} in 2-3 simple sentences. Use a simple real-world analogy. Very easy to understand.",
@@ -91,7 +90,6 @@ def generate_single_lesson(subject: str, subject_type: str, day: int, topics_see
             max_tokens=250
         )
 
-    # Get key points
     keypoints_raw = call_groq_text(
         f"List 3 key points about '{topic}' in {subject}. One per line. No numbering. Short phrases only.",
         max_tokens=80
@@ -101,13 +99,11 @@ def generate_single_lesson(subject: str, subject_type: str, day: int, topics_see
         keypoints = [f"Understand {topic}", "Practice regularly", "Apply the concept"]
 
     if subject_type == "coding":
-        # Get syntax example
         syntax_raw = call_groq_text(
             f"Show basic syntax/code example for '{topic}' in {subject}. Day {day} level. Include comments. 5-8 lines max.",
             max_tokens=200
         )
 
-        # Get challenge - DIFFERENT for stressed vs normal
         if is_stressed:
             challenge_raw = call_groq_text(
                 f"Give a VERY SIMPLE coding task for '{topic}' suitable for a stressed beginner. Just print something or assign variables. One line of code is enough. State the task clearly.",
@@ -162,7 +158,6 @@ def generate_single_lesson(subject: str, subject_type: str, day: int, topics_see
             q_text = ""
             options = []
             answer = "A. "
-            explanation = ""
             for line in lines:
                 if line.startswith("Q:"):
                     q_text = line[2:].strip()
@@ -252,3 +247,17 @@ def _fallback(subject, subject_type, day, is_stressed=False):
         "questions": [{"q": f"Why is {subject} important?", "options": [f"A. It has real-world applications", "B. No reason", "C. Only for exams", "D. None"], "answer": f"A. It has real-world applications", "explanation": f"{subject} has many real-world uses."}],
         "mood_adjusted": is_stressed
     }
+
+
+def summarize_lesson(text: str) -> list:
+    """Summarize lesson content into 3 bullet points"""
+    raw = call_groq_text(
+        f"Summarize this lesson content into exactly 3 bullet points. Each bullet must be one clear, simple sentence a student can quickly read. No numbering, no dashes, one per line.\n\n{text}",
+        max_tokens=150
+    )
+    bullets = [l.strip().lstrip('-•*').strip() for l in raw.split('\n') if l.strip()][:3]
+    return bullets if bullets else [
+        "Read the introduction carefully.",
+        "Focus on the key concept explained.",
+        "Practice the exercise to reinforce learning."
+    ]

@@ -1,9 +1,12 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from dotenv import load_dotenv
 import os
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:******@localhost:5432/******")
+load_dotenv()
+
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/tasknova")
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -23,3 +26,9 @@ def create_tables():
     from models.mood import MoodLog
     from models.session import StudySession
     Base.metadata.create_all(bind=engine)
+    with engine.connect() as conn:
+        try:
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS disability VARCHAR DEFAULT ''"))
+            conn.commit()
+        except Exception:
+            conn.rollback()

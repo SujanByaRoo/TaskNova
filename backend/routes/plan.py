@@ -6,7 +6,7 @@ from database.db import get_db
 from models.plan import Subject, Lesson
 from models.mood import MoodLog
 from models.streak import Streak
-from ai.planner import validate_subject, generate_single_lesson
+from ai.planner import validate_subject, generate_single_lesson, summarize_lesson
 from datetime import datetime, date, timedelta
 import json
 
@@ -20,6 +20,13 @@ class CompleteRequest(BaseModel):
     user_id: int
     code_answer: Optional[str] = None
 
+class SummarizeRequest(BaseModel):
+    text: str
+
+@router.post("/summarize")
+def summarize(req: SummarizeRequest):
+    bullets = summarize_lesson(req.text)
+    return {"bullets": bullets}
 
 @router.delete("/subject/{subject_id}")
 def delete_subject(subject_id: int, db: Session = Depends(get_db)):

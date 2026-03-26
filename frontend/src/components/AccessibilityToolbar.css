@@ -1,0 +1,223 @@
+/* ── Floating button ─────────────────────────────────────────────── */
+.a11y-panel {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.a11y-fab {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #6c63ff;
+  color: #fff;
+  border: none;
+  font-size: 22px;
+  cursor: pointer;
+  box-shadow: 0 4px 18px rgba(108,99,255,.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform .15s;
+}
+.a11y-fab:hover { transform: scale(1.1); }
+
+/* ── Menu card ───────────────────────────────────────────────────── */
+.a11y-menu {
+  background: #1e1e2e;
+  border: 1px solid #333;
+  border-radius: 14px;
+  padding: 16px;
+  width: 260px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.5);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.a11y-menu__header {
+  font-size: 14px;
+  font-weight: 700;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  margin-bottom: 2px;
+}
+
+.a11y-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #6c63ff;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  margin-top: 4px;
+}
+
+/* ── Toggle row ──────────────────────────────────────────────────── */
+.a11y-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  font-size: 13px;
+  color: #ddd;
+  user-select: none;
+}
+.a11y-toggle input { display: none; }
+
+.a11y-toggle__slider {
+  width: 40px;
+  height: 22px;
+  border-radius: 11px;
+  background: #444;
+  position: relative;
+  flex-shrink: 0;
+  transition: background .2s;
+}
+.a11y-toggle__slider::after {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  top: 3px;
+  left: 3px;
+  transition: transform .2s;
+}
+.a11y-toggle input:checked ~ .a11y-toggle__slider { background: #6c63ff; }
+.a11y-toggle input:checked ~ .a11y-toggle__slider::after { transform: translateX(18px); }
+
+/* ── Font size row ───────────────────────────────────────────────── */
+.a11y-font-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #ddd;
+}
+.a11y-font-btns { display: flex; gap: 6px; }
+.a11y-font-btn {
+  background: #333;
+  border: 1px solid #555;
+  color: #ccc;
+  border-radius: 6px;
+  padding: 3px 8px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background .15s;
+}
+.a11y-font-btn.active, .a11y-font-btn:hover {
+  background: #6c63ff;
+  color: #fff;
+  border-color: #6c63ff;
+}
+
+/* ── Global overrides via :root class ────────────────────────────── */
+:root.a11y-font-large  { font-size: 18px !important; }
+:root.a11y-font-xlarge { font-size: 22px !important; }
+
+:root.a11y-high-contrast {
+  --bg-primary: #000 !important;
+  --bg-secondary: #111 !important;
+  --text-primary: #fff !important;
+  --text-secondary: #ff0 !important;
+  filter: contrast(1.4);
+}
+
+:root.a11y-focus-mode .sidebar,
+:root.a11y-focus-mode .dashboard-header,
+:root.a11y-focus-mode .nav-sidebar {
+  opacity: 0.15;
+  pointer-events: none;
+}
+:root.a11y-focus-mode .lesson-card,
+:root.a11y-focus-mode .subject-main {
+  max-width: 720px;
+  margin: 0 auto;
+  font-size: 1.1em;
+  line-height: 1.9;
+}
+
+/* ── STT mic button ──────────────────────────────────────────────── */
+.stt-mic-btn {
+  background: #333;
+  border: none;
+  color: #fff;
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background .15s;
+}
+.stt-mic-btn.listening { background: #e74c3c; animation: pulse 1s infinite; }
+.stt-mic-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* ── TTS read button ─────────────────────────────────────────────── */
+.tts-read-btn {
+  background: transparent;
+  border: 1px solid #6c63ff;
+  color: #6c63ff;
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: background .15s;
+}
+.tts-read-btn:hover { background: #6c63ff; color: #fff; }
+
+/* ── Summary box ─────────────────────────────────────────────────── */
+.a11y-summary-box {
+  background: #1a1a2e;
+  border: 1px solid #6c63ff44;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-top: 10px;
+}
+.a11y-summary-box h4 {
+  color: #6c63ff;
+  font-size: 13px;
+  margin: 0 0 8px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+.a11y-summary-box ul {
+  margin: 0;
+  padding-left: 18px;
+  color: #ccc;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.a11y-summary-loading {
+  color: #888;
+  font-size: 13px;
+  font-style: italic;
+}
+
+/* ── Auto-configured profile badge ──────────────────────────────── */
+.a11y-profile-badge {
+  background: #6c63ff22;
+  border: 1px solid #6c63ff55;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 11px;
+  color: #a89fff;
+  font-weight: 600;
+  line-height: 1.4;
+}

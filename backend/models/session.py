@@ -8,7 +8,7 @@ class StudySession(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    task_id = Column(Integer, nullable=True) 
+    task_id = Column(Integer, ForeignKey("plan_tasks.id"), nullable=True)
     subject = Column(String, nullable=False)
     duration_minutes = Column(Float, default=0)
     xp_earned = Column(Integer, default=0)

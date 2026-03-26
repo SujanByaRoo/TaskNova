@@ -19,6 +19,7 @@ export default function Login() {
       const res = await loginUser(form)
       localStorage.setItem('user_id', res.data.user_id)
       localStorage.setItem('user_name', res.data.name)
+      localStorage.setItem('user_disability', res.data.disability || '')
       navigate('/dashboard')
     } catch (err) {
       setError(err.response?.data?.detail || 'Login failed')
@@ -36,6 +37,11 @@ export default function Login() {
         <form onSubmit={submit}>
           <input name="email" type="email" placeholder="Email" value={form.email} onChange={handle} required />
           <input name="password" type="password" placeholder="Password" value={form.password} onChange={handle} required />
+          <div style={{ textAlign: 'right', marginTop: '-4px' }}>
+            <Link to="/forgot-password" style={{ fontSize: '12px', color: '#4f6ef7', textDecoration: 'none', fontWeight: 600 }}>
+              Forgot password?
+            </Link>
+          </div>
           <button type="submit" disabled={loading}>{loading ? 'Logging in...' : 'Login'}</button>
         </form>
         <p className="auth-link">No account? <Link to="/register">Register</Link></p>
