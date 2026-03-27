@@ -80,7 +80,6 @@ function AccessibilityToolbar({ open, setOpen, tts, setTts, stt, setStt,
         <div className="a11y-menu" role="dialog" aria-label="Accessibility options">
           <div className="a11y-menu__header">Accessibility</div>
 
-          {/* Show auto-applied profile if disability set */}
           {(() => {
             const raw = localStorage.getItem('user_disability') || ''
             const tags = raw.split(',').filter(Boolean)
@@ -92,22 +91,31 @@ function AccessibilityToolbar({ open, setOpen, tts, setTts, stt, setStt,
               </div>
             )
           })()}
+
           <div className="a11y-section-label">Visual</div>
 
-          <label className="a11y-toggle">
-            <span>Text-to-Speech</span>
-            <input type="checkbox" checked={tts} onChange={e => setTts(e.target.checked)} />
-            <span className="a11y-toggle__slider" />
-          </label>
+          <div className="a11y-toggle-row">
+            <span className="a11y-toggle-label">Text-to-Speech</span>
+            <label className="a11y-toggle">
+              <input type="checkbox" checked={tts} onChange={e => setTts(e.target.checked)} />
+              <span className="a11y-toggle__slider" />
+            </label>
+          </div>
 
-          <label className="a11y-toggle">
-            <span>High Contrast</span>
-            <input type="checkbox" checked={highContrast} onChange={e => setHighContrast(e.target.checked)} />
-            <span className="a11y-toggle__slider" />
-          </label>
+          <div className="a11y-divider" />
+
+          <div className="a11y-toggle-row">
+            <span className="a11y-toggle-label">High Contrast</span>
+            <label className="a11y-toggle">
+              <input type="checkbox" checked={highContrast} onChange={e => setHighContrast(e.target.checked)} />
+              <span className="a11y-toggle__slider" />
+            </label>
+          </div>
+
+          <div className="a11y-divider" />
 
           <div className="a11y-font-row">
-            <span>Font Size</span>
+            <span className="a11y-font-label">Font Size</span>
             <div className="a11y-font-btns">
               {['normal', 'large', 'xlarge'].map(s => (
                 <button
@@ -121,23 +129,26 @@ function AccessibilityToolbar({ open, setOpen, tts, setTts, stt, setStt,
             </div>
           </div>
 
-          {/* Hearing */}
           <div className="a11y-section-label">Hearing</div>
 
-          <label className="a11y-toggle">
-            <span>Speech-to-Text Input</span>
-            <input type="checkbox" checked={stt} onChange={e => setStt(e.target.checked)} />
-            <span className="a11y-toggle__slider" />
-          </label>
+          <div className="a11y-toggle-row">
+            <span className="a11y-toggle-label">Speech-to-Text Input</span>
+            <label className="a11y-toggle">
+              <input type="checkbox" checked={stt} onChange={e => setStt(e.target.checked)} />
+              <span className="a11y-toggle__slider" />
+            </label>
+          </div>
 
-          {/* Cognitive */}
           <div className="a11y-section-label">Cognitive</div>
 
-          <label className="a11y-toggle">
-            <span>Focus Mode</span>
-            <input type="checkbox" checked={focusMode} onChange={e => setFocusMode(e.target.checked)} />
-            <span className="a11y-toggle__slider" />
-          </label>
+          <div className="a11y-toggle-row">
+            <span className="a11y-toggle-label">Focus Mode</span>
+            <label className="a11y-toggle">
+              <input type="checkbox" checked={focusMode} onChange={e => setFocusMode(e.target.checked)} />
+              <span className="a11y-toggle__slider" />
+            </label>
+          </div>
+
         </div>
       )}
     </div>

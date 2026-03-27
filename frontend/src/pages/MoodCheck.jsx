@@ -4,7 +4,7 @@ import { logMood } from '../services/api'
 import './Mood.css'
 
 const MOODS = [
-  { score: 1, emoji: '😰', label: 'Stressed' },
+  { score: 1, emoji: '🤯', label: 'Stressed' },
   { score: 2, emoji: '😴', label: 'Tired' },
   { score: 3, emoji: '😐', label: 'Okay' },
   { score: 4, emoji: '😊', label: 'Good' },
@@ -31,11 +31,10 @@ export default function MoodCheck() {
 
   return (
     <div className="mood-container">
-      <nav className="navbar">
-        <div className="nav-logo">⚡ TaskNova</div>
-        <div className="nav-links">
+      <nav className="mood-nav">
+        <div className="mood-nav-logo">⚡ Task<span>Nova</span></div>
+        <div className="mood-nav-links">
           <Link to="/dashboard">Home</Link>
-          <Link to="/planner">Planner</Link>
           <Link to="/mood">Mood</Link>
           <Link to="/profile">Profile</Link>
         </div>
@@ -44,48 +43,52 @@ export default function MoodCheck() {
       <div className="mood-content">
         {!result ? (
           <>
-            <h1>How are you feeling?</h1>
-            <p className="sub">Your study plan adjusts based on your mood</p>
+            <h1 className="mood-title">How are you feeling?</h1>
+            <p className="mood-sub">Your study plan adjusts based on your mood</p>
 
             <div className="mood-grid">
               {MOODS.map(m => (
                 <div
                   key={m.score}
-                  className={`mood-btn ${selected === m.score ? 'selected' : ''}`}
+                  className={`mood-card-btn${selected === m.score ? ' mood-card-btn--sel' : ''}`}
                   onClick={() => setSelected(m.score)}
                 >
-                  <div className="mood-emoji">{m.emoji}</div>
-                  <div className="mood-label">{m.label}</div>
+                  <span className="mood-card-emoji">{m.emoji}</span>
+                  <span className="mood-card-label">{m.label}</span>
                 </div>
               ))}
             </div>
 
             <textarea
+              className="mood-textarea"
               placeholder="Optional note... (how's your day going?)"
               value={note}
               onChange={e => setNote(e.target.value)}
             />
 
-            <button onClick={submit} disabled={!selected || loading}>
+            <button
+              className="mood-submit-btn"
+              onClick={submit}
+              disabled={!selected || loading}
+            >
               {loading ? 'Logging...' : 'Log Mood'}
             </button>
           </>
         ) : (
-          <div className="result-box">
-            <div className="result-emoji">
-              {MOODS.find(m => m.label.toLowerCase() === result.mood)?.emoji}
+          <div className="mood-result">
+            <div className="mood-result__emoji">
+              {MOODS.find(m => m.score === selected)?.emoji}
             </div>
-            <h2>Mood logged: {result.mood}</h2>
-            <p>{result.message}</p>
+            <h2 className="mood-result__title">Mood logged!</h2>
+            <p className="mood-result__msg">{result.message}</p>
             {result.stress_detected && (
-              <div className="stress-alert">
-                ⚠️ Stress detected — today's plan has been made lighter for you.
+              <div className="mood-stress-alert">
+                ⚠️ Stress detected — today's lesson has been made lighter for you.
               </div>
             )}
-            <div className="result-actions">
-              <button onClick={() => navigate('/dashboard')}>View Plan</button>
-              <button className="secondary" onClick={() => navigate('/dashboard')}>Dashboard</button>
-            </div>
+            <button className="mood-submit-btn" style={{marginTop: '20px'}} onClick={() => navigate('/dashboard')}>
+              Back to Dashboard
+            </button>
           </div>
         )}
       </div>

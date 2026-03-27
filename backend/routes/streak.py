@@ -67,3 +67,21 @@ def update_overall_streak(user_id: int, xp_to_add: int = 30, db: Session = Depen
         "total_xp": streak.total_xp,
         "message": f"+{xp_to_add} XP earned!"
     }
+
+
+@router.get("/leaderboard/global")
+def get_global_leaderboard(db: Session = Depends(get_db)):
+    """Return top 10 users by XP/streak for the global leaderboard"""
+    from models.user import User
+    streaks = db.query(Streak).order_by(Streak.total_xp.desc()).limit(10).all()
+    result = []
+    for s in streaks:
+        user = db.query(User).filter(User.id == s.user_id).first()
+        result.append({
+            "user_id": s.user_id,
+            "username": user.name if user else f"User{s.user_id}",
+            "current_streak": s.current_streak,
+            "total_xp": s.total_xp,
+            "longest_streak": s.longest_streak
+        })
+    return {"leaderboard": result}

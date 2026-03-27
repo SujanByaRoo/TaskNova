@@ -29,6 +29,7 @@ export default function Dashboard(){
   const [addErr,   setAddErr]   = useState('')
   const [adding,   setAdding]   = useState(false)
   const [xpW,      setXpW]      = useState(0)
+  const [leaderboard, setLeaderboard] = useState([])
 
   useEffect(()=>{ if(!userId){navigate('/login');return} load() },[])
   useEffect(()=>{ if(streak) setTimeout(()=>setXpW((streak.xp_in_level/500)*100),300) },[streak])
@@ -40,6 +41,7 @@ export default function Dashboard(){
         axios.get(`${API}/plan/${userId}/subjects`)
       ])
       setStreak(s.data); setSubjects(sub.data.subjects)
+      try{ const lb = await axios.get(`${API}/streak/leaderboard/global`); setLeaderboard(lb.data.leaderboard || []) }catch{}
     }catch{}
   }
 
@@ -214,6 +216,34 @@ export default function Dashboard(){
               <div className="empty">
                 <span className="empty-icon">📚</span>
                 <p>No subjects yet. Add one above to begin!</p>
+              </div>
+            )}
+
+            {leaderboard.length>0&&(
+              <div className="lb-section">
+                <div className="lb-header">
+                  <div className="lb-title">🏆 Global Leaderboard</div>
+                  <div className="lb-sub">Top learners this week</div>
+                </div>
+                <div className="lb-list">
+                  {leaderboard.slice(0,10).map((entry,i)=>{
+                    const isMe = entry.user_id===parseInt(userId)
+                    const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':null
+                    return(
+                      <div key={i} className={`lb-row${isMe?' lb-me':''}`} style={isMe?{'--lbc':'#4f46e5'}:{}}>
+                        <div className="lb-rank">{medal||`#${i+1}`}</div>
+                        <div className="lb-name">
+                          {entry.username}
+                          {isMe&&<span className="lb-you-tag">you</span>}
+                        </div>
+                        <div className="lb-right">
+                          <span className="lb-streak">🔥 {entry.current_streak}</span>
+                          <span className="lb-xp">⚡ {entry.total_xp} XP</span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
             )}
 

@@ -1,12 +1,8 @@
 import requests
 import json
 import re
-import os
-from dotenv import load_dotenv
 
-load_dotenv()
-
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GROQ_API_KEY = GROQ_API_KEY_REMOVED" "
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 MODEL = "llama-3.3-70b-versatile"
 
@@ -56,29 +52,37 @@ Rules for type:
     for t in ["coding", "aiml", "math", "language", "theory"]:
         if f"type: {t}" in raw or f"type:{t}" in raw:
             return t
+    # If valid but type unclear default to theory
     if "valid: yes" in raw or "valid:yes" in raw:
         return "theory"
     return None
 
 
-def generate_single_lesson(subject: str, subject_type: str, day: int, topics_seen: list, mood_score: int = 5) -> dict:
+def generate_single_lesson(subject: str, subject_type: str, day: int, topics_seen: list, mood_score: int = 5, forced_topic: str = None) -> dict:
     seen = ", ".join(topics_seen[-5:]) if topics_seen else "none"
     is_stressed = mood_score <= 2
 
+    # Build lesson using separate calls to avoid JSON issues
     difficulty = "beginner introduction" if day <= 2 else "intermediate" if day <= 5 else "advanced"
     mood_str = "stressed student - keep SHORT and SIMPLE" if is_stressed else "normal student - full lesson"
 
-    topic_raw = call_groq_text(
-        f"What should a {difficulty} student learn in {subject} on Day {day}? Previously covered: {seen}. Give me ONLY the topic name, nothing else. 5 words max.",
-        max_tokens=20
-    )
-    topic = topic_raw.strip().strip('"').strip("'") or f"{subject} Day {day} Basics"
+    # Get topic — use forced_topic if provided, else AI-pick
+    if forced_topic:
+        topic = forced_topic.strip()
+    else:
+        topic_raw = call_groq_text(
+            f"What should a {difficulty} student learn in {subject} on Day {day}? Previously covered: {seen}. Give me ONLY the topic name, nothing else. 5 words max.",
+            max_tokens=20
+        )
+        topic = topic_raw.strip().strip('"').strip("'") or f"{subject} Day {day} Basics"
 
+    # Get introduction
     intro_raw = call_groq_text(
         f"Write a 2-sentence introduction for a lesson on '{topic}' in {subject}. Student mood: {mood_str}. Be direct and motivating.",
         max_tokens=100
     )
 
+    # Get concept explanation
     if is_stressed:
         concept_raw = call_groq_text(
             f"Explain '{topic}' in {subject} in 2-3 simple sentences. Use a simple real-world analogy. Very easy to understand.",
@@ -90,6 +94,7 @@ def generate_single_lesson(subject: str, subject_type: str, day: int, topics_see
             max_tokens=250
         )
 
+    # Get key points
     keypoints_raw = call_groq_text(
         f"List 3 key points about '{topic}' in {subject}. One per line. No numbering. Short phrases only.",
         max_tokens=80
@@ -99,11 +104,13 @@ def generate_single_lesson(subject: str, subject_type: str, day: int, topics_see
         keypoints = [f"Understand {topic}", "Practice regularly", "Apply the concept"]
 
     if subject_type == "coding":
+        # Get syntax example
         syntax_raw = call_groq_text(
             f"Show basic syntax/code example for '{topic}' in {subject}. Day {day} level. Include comments. 5-8 lines max.",
             max_tokens=200
         )
 
+        # Get challenge - DIFFERENT for stressed vs normal
         if is_stressed:
             challenge_raw = call_groq_text(
                 f"Give a VERY SIMPLE coding task for '{topic}' suitable for a stressed beginner. Just print something or assign variables. One line of code is enough. State the task clearly.",
@@ -158,6 +165,7 @@ def generate_single_lesson(subject: str, subject_type: str, day: int, topics_see
             q_text = ""
             options = []
             answer = "A. "
+            explanation = ""
             for line in lines:
                 if line.startswith("Q:"):
                     q_text = line[2:].strip()
@@ -223,6 +231,67 @@ def generate_single_lesson(subject: str, subject_type: str, day: int, topics_see
         }
 
 
+def summarize_lesson(text: str) -> list:
+    """Summarize lesson text into bullet points"""
+    raw = call_groq_text(
+        f"Summarize the following lesson content into 4-5 concise bullet points. Each point on a new line starting with '-':\n\n{text[:2000]}",
+        max_tokens=300
+    )
+    points = [p.strip().lstrip('-').lstrip('•').strip() for p in raw.split('\n') if p.strip()]
+    return points[:5] if points else ["Review the lesson content above"]
+
+
+def suggest_topics(subject: str, subject_type: str, topics_seen: list) -> list:
+    """Suggest 5 fresh topics for the user to pick from"""
+    seen = ", ".join(topics_seen[-8:]) if topics_seen else "none"
+    raw = call_groq_text(
+        f"Suggest 5 specific topics to learn in {subject} (type: {subject_type}). Already covered: {seen}. "
+        f"Give only topic names, one per line, no numbering, no explanation. Keep each under 6 words.",
+        max_tokens=100
+    )
+    topics = [t.strip().lstrip('-').strip() for t in raw.split('\n') if t.strip()]
+    return topics[:5] if topics else [f"{subject} Advanced Concepts", f"{subject} Practice Problems"]
+
+
+def generate_skip_test(subject: str, subject_type: str, day: int, topics_seen: list) -> dict:
+    """Generate a 5-question test to let user skip the current day"""
+    seen = ", ".join(topics_seen[-5:]) if topics_seen else "none"
+    questions = []
+    for i in range(5):
+        q_raw = call_groq_text(
+            f"Write a Day {day} level question for {subject}. Context: {seen}. "
+            f"Format exactly:\nQ: [question]\nA: [correct answer]\nB: [wrong answer]\nC: [wrong answer]\nD: [wrong answer]\nCorrect: A",
+            max_tokens=120
+        )
+        lines = q_raw.strip().split('\n')
+        q_text, options, answer = "", [], ""
+        for line in lines:
+            if line.startswith("Q:"):
+                q_text = line[2:].strip()
+            elif line.startswith("A:"):
+                options.append("A. " + line[2:].strip())
+                answer = "A. " + line[2:].strip()
+            elif line.startswith("B:"):
+                options.append("B. " + line[2:].strip())
+            elif line.startswith("C:"):
+                options.append("C. " + line[2:].strip())
+            elif line.startswith("D:"):
+                options.append("D. " + line[2:].strip())
+        if q_text and len(options) == 4:
+            questions.append({"q": q_text, "options": options, "answer": answer})
+    if not questions:
+        questions = [{"q": f"What is a key concept in {subject}?",
+                      "options": [f"A. A core concept in {subject}", "B. Unrelated topic", "C. Not studied yet", "D. None of above"],
+                      "answer": f"A. A core concept in {subject}"}]
+    return {"questions": questions}
+
+
+def answer_doubt(question: str, lesson_context: str) -> str:
+    """Answer a student's doubt about a lesson"""
+    prompt = f"You are a helpful tutor. A student is studying and has a doubt.\n\nLesson context:\n{lesson_context[:1000]}\n\nStudent question: {question}\n\nAnswer clearly and concisely in 3-5 sentences. Be encouraging."
+    return call_groq_text(prompt, max_tokens=250) or "I couldn't fetch an answer right now. Please try again."
+
+
 def _fallback(subject, subject_type, day, is_stressed=False):
     if subject_type == "coding":
         return {
@@ -249,15 +318,113 @@ def _fallback(subject, subject_type, day, is_stressed=False):
     }
 
 
-def summarize_lesson(text: str) -> list:
-    """Summarize lesson content into 3 bullet points"""
+def generate_visual_diagram(topic: str, concept: str, subject_type: str) -> str:
+    """
+    Generate a simple, valid Mermaid flowchart for the lesson topic.
+    Rules enforced in prompt:
+    - Only flowchart TD
+    - Node labels wrapped in quotes to avoid special char issues
+    - Max 8 nodes
+    - No subgraph, no classDef, no style blocks
+    - No parentheses or special chars inside node labels
+    """
     raw = call_groq_text(
-        f"Summarize this lesson content into exactly 3 bullet points. Each bullet must be one clear, simple sentence a student can quickly read. No numbering, no dashes, one per line.\n\n{text}",
-        max_tokens=150
+        f"""Create a Mermaid flowchart diagram for the concept: "{topic}"
+Context: {concept[:300]}
+
+STRICT RULES - follow exactly or the diagram will break:
+1. Start with: flowchart TD
+2. Each node must use this format ONLY: A["label text"]
+3. Arrows: A --> B
+4. Max 8 nodes total
+5. Node labels: plain words only, NO parentheses, NO colons, NO special characters
+6. NO subgraph, NO classDef, NO style, NO click
+7. Output ONLY the mermaid code, nothing else, no explanation, no markdown fences
+
+Example of correct format:
+flowchart TD
+    A["Start"] --> B["Step One"]
+    B --> C["Step Two"]
+    C --> D["Result"]
+
+Now generate the diagram for: {topic}""",
+        max_tokens=300
     )
-    bullets = [l.strip().lstrip('-•*').strip() for l in raw.split('\n') if l.strip()][:3]
-    return bullets if bullets else [
-        "Read the introduction carefully.",
-        "Focus on the key concept explained.",
-        "Practice the exercise to reinforce learning."
-    ]
+
+    # Strip any markdown fences the model adds
+    lines = []
+    for line in raw.strip().split('\n'):
+        stripped = line.strip()
+        if stripped.startswith('```'):
+            continue
+        lines.append(line)
+    cleaned = '\n'.join(lines).strip()
+
+    # Must start with flowchart
+    if not cleaned.startswith('flowchart'):
+        # Build a safe fallback from keypoints
+        cleaned = _build_fallback_diagram(topic, concept)
+
+    return cleaned
+
+
+def _build_fallback_diagram(topic: str, concept: str) -> str:
+    """Build a guaranteed-valid simple flowchart from the topic"""
+    # Extract up to 5 sentences from concept as steps
+    sentences = [s.strip() for s in concept.replace('\n', ' ').split('.') if len(s.strip()) > 10][:4]
+    lines = ['flowchart TD']
+    prev = 'A'
+    node_labels = [f'Learn "{topic}"'] + [s[:40] for s in sentences] + ['Apply Knowledge']
+    letters = 'ABCDEFGH'
+    for i, label in enumerate(node_labels[:6]):
+        letter = letters[i]
+        # Sanitize: remove quotes, parens, colons inside label
+        safe = label.replace('"', '').replace("'", '').replace('(', '').replace(')', '').replace(':', ' -')
+        lines.append(f'    {letter}["{safe}"]')
+        if i > 0:
+            lines.append(f'    {letters[i-1]} --> {letter}')
+    return '\n'.join(lines)
+
+
+SUPPORTED_LANGUAGES = {
+    "English": "English",
+    "Tamil": "Tamil",
+    "Hindi": "Hindi",
+    "Telugu": "Telugu",
+    "Kannada": "Kannada",
+    "Malayalam": "Malayalam",
+    "Bengali": "Bengali",
+    "French": "French",
+    "German": "German",
+    "Spanish": "Spanish",
+    "Arabic": "Arabic",
+    "Japanese": "Japanese",
+    "Chinese": "Chinese (Simplified)"
+}
+
+
+def translate_lesson_content(content: str, target_language: str) -> str:
+    """Translate plain English lesson content to the target language"""
+    if target_language == "English":
+        return content
+    raw = call_groq_text(
+        f"Translate the following educational content to {target_language}. "
+        f"Keep all technical terms and code examples in English. "
+        f"Translate only the explanatory text. "
+        f"Return only the translated text, nothing else.\n\n{content[:2000]}",
+        max_tokens=1500
+    )
+    return raw or content
+
+
+def answer_doubt_in_language(question: str, lesson_context: str, language: str = "English") -> str:
+    """Answer a student doubt in the chosen language"""
+    lang_instruction = f"Reply ONLY in {language}." if language != "English" else "Reply in English."
+    prompt = (
+        f"You are a helpful tutor. {lang_instruction}\n\n"
+        f"Lesson context:\n{lesson_context[:1000]}\n\n"
+        f"Student question: {question}\n\n"
+        f"Answer clearly in 3-5 sentences. Be encouraging. "
+        f"Keep technical terms and code examples in English even if replying in another language."
+    )
+    return call_groq_text(prompt, max_tokens=300) or "Could not get answer. Please try again."

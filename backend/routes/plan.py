@@ -6,7 +6,7 @@ from database.db import get_db
 from models.plan import Subject, Lesson
 from models.mood import MoodLog
 from models.streak import Streak
-from ai.planner import validate_subject, generate_single_lesson, summarize_lesson
+from ai.planner import validate_subject, generate_single_lesson, summarize_lesson, suggest_topics, generate_skip_test, answer_doubt, generate_visual_diagram, translate_lesson_content, answer_doubt_in_language, SUPPORTED_LANGUAGES
 from datetime import datetime, date, timedelta
 import json
 
@@ -23,10 +23,21 @@ class CompleteRequest(BaseModel):
 class SummarizeRequest(BaseModel):
     text: str
 
-@router.post("/summarize")
-def summarize(req: SummarizeRequest):
-    bullets = summarize_lesson(req.text)
-    return {"bullets": bullets}
+class GenerateTopicRequest(BaseModel):
+    topic: str
+
+class DoubtRequest(BaseModel):
+    question: str
+    lesson_context: Optional[str] = ""
+    language: Optional[str] = "English"
+
+class TranslateRequest(BaseModel):
+    content: str
+    target_language: str
+
+class SkipTestSubmitRequest(BaseModel):
+    answers: dict
+
 
 @router.delete("/subject/{subject_id}")
 def delete_subject(subject_id: int, db: Session = Depends(get_db)):
@@ -398,3 +409,144 @@ def get_weekly_progress(user_id: int, subject_id: int = None, db: Session = Depe
             "is_today": i == 0
         })
     return {"week": week}
+
+
+# ── NEW ENDPOINTS FOR REBUILT FRONTEND ────────────────────────────────────────
+
+@router.post("/summarize")
+def summarize_lesson_route(req: SummarizeRequest):
+    """Summarize lesson text into bullet points"""
+    points = summarize_lesson(req.text)
+    return {"summary": points}
+
+
+@router.post("/subject/{subject_id}/suggest-topics")
+def suggest_topics_route(subject_id: int, user_id: int, db: Session = Depends(get_db)):
+    """Return 5 AI-suggested topics the user can pick for their next lesson"""
+    subject = db.query(Subject).filter(Subject.id == subject_id).first()
+    if not subject:
+        raise HTTPException(status_code=404, detail="Subject not found")
+    topics_seen = json.loads(subject.topics_seen) if subject.topics_seen else []
+    topics = suggest_topics(subject.name, subject.subject_type, topics_seen)
+    return {"topics": topics}
+
+
+@router.post("/subject/{subject_id}/generate-lesson-topic")
+def generate_lesson_with_topic(subject_id: int, user_id: int, req: GenerateTopicRequest, db: Session = Depends(get_db)):
+    """Generate a lesson for a user-chosen or AI-suggested topic"""
+    subject = db.query(Subject).filter(Subject.id == subject_id).first()
+    if not subject:
+        raise HTTPException(status_code=404, detail="Subject not found")
+
+    today = date.today()
+    mood_log = db.query(MoodLog).filter(
+        MoodLog.user_id == subject.user_id,
+        MoodLog.logged_at >= datetime.combine(today, datetime.min.time())
+    ).order_by(MoodLog.logged_at.desc()).first()
+    mood_score = mood_log.mood_score if mood_log else 5
+
+    topics_seen = json.loads(subject.topics_seen) if subject.topics_seen else []
+
+    # Delete any existing incomplete lesson for this day before generating new one
+    existing = db.query(Lesson).filter(
+        Lesson.subject_id == subject_id,
+        Lesson.day_number == subject.current_day,
+        Lesson.is_extra == False
+    ).first()
+    if existing and not existing.is_completed:
+        db.delete(existing)
+        db.commit()
+
+    lesson_data = generate_single_lesson(
+        subject=subject.name,
+        subject_type=subject.subject_type,
+        day=subject.current_day,
+        topics_seen=topics_seen,
+        mood_score=mood_score,
+        forced_topic=req.topic
+    )
+
+    topic = lesson_data.get("topic", req.topic)
+    lesson = Lesson(
+        subject_id=subject_id,
+        user_id=subject.user_id,
+        day_number=subject.current_day,
+        topic=topic,
+        lesson_content=json.dumps(lesson_data),
+        task_type=lesson_data.get("task_type", "quiz"),
+        task_content=json.dumps(lesson_data)
+    )
+    db.add(lesson)
+    db.commit()
+    db.refresh(lesson)
+
+    return {
+        "lesson_id": lesson.id,
+        "day": lesson.day_number,
+        "topic": lesson.topic,
+        "lesson": lesson.lesson_content,
+        "task_type": lesson.task_type,
+        "task_data": lesson_data,
+        "is_completed": lesson.is_completed,
+        "mood_adjusted": lesson_data.get("mood_adjusted", False)
+    }
+
+
+@router.post("/subject/{subject_id}/skip-test")
+def get_skip_test(subject_id: int, user_id: int, db: Session = Depends(get_db)):
+    """Generate a 5-question test; if user scores 80%+ they skip current day"""
+    subject = db.query(Subject).filter(Subject.id == subject_id).first()
+    if not subject:
+        raise HTTPException(status_code=404, detail="Subject not found")
+    topics_seen = json.loads(subject.topics_seen) if subject.topics_seen else []
+    test_data = generate_skip_test(subject.name, subject.subject_type, subject.current_day, topics_seen)
+    return test_data
+
+
+@router.post("/subject/{subject_id}/skip-test/submit")
+def submit_skip_test(subject_id: int, user_id: int, req: SkipTestSubmitRequest, db: Session = Depends(get_db)):
+    """If user passed the skip test, advance their day"""
+    subject = db.query(Subject).filter(Subject.id == subject_id).first()
+    if not subject:
+        raise HTTPException(status_code=404, detail="Subject not found")
+
+    # Advance day — treat as a skipped completion
+    subject.current_day += 1
+    subject.last_active_date = datetime.utcnow()
+    db.commit()
+
+    return {"message": "Day skipped!", "new_day": subject.current_day}
+
+
+
+class VisualRequest(BaseModel):
+    topic: str
+    concept: str
+    subject_type: str
+
+@router.post("/visual")
+def generate_visual(req: VisualRequest):
+    diagram = generate_visual_diagram(req.topic, req.concept, req.subject_type)
+    return {"diagram": diagram}
+
+@router.get("/supported-languages")
+def get_supported_languages():
+    """Return all supported languages for translation and doubt chat"""
+    return {"languages": list(SUPPORTED_LANGUAGES.keys())}
+
+
+@router.post("/translate")
+def translate_content(req: TranslateRequest):
+    """Translate lesson content to the target language"""
+    if req.target_language not in SUPPORTED_LANGUAGES:
+        raise HTTPException(status_code=400, detail=f"Unsupported language: {req.target_language}")
+    translated = translate_lesson_content(req.content, req.target_language)
+    return {"translated": translated, "language": req.target_language}
+
+
+@router.post("/doubt")
+def answer_doubt_route(req: DoubtRequest):
+    """Answer a student doubt contextually in the chosen language"""
+    language = req.language if req.language in SUPPORTED_LANGUAGES else "English"
+    answer = answer_doubt_in_language(req.question, req.lesson_context or "", language)
+    return {"answer": answer, "language": language}
