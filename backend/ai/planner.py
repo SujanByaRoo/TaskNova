@@ -2,8 +2,8 @@ import requests
 import json
 import re
 
-GROQ_API_KEY = GROQ_API_KEY_REMOVED" "
-GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+GROQ_API_KEY = "your groq key"
+GROQ_URL = "your URL"
 MODEL = "llama-3.3-70b-versatile"
 
 
